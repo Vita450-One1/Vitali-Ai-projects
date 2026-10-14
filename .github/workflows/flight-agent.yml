@@ -1,0 +1,28 @@
+name: Daily flight prices
+
+on:
+  schedule:
+    # Every day at 06:13 UTC. Change this to your morning:
+    # https://crontab.guru helps translate times.
+    - cron: "13 6 * * *"
+  workflow_dispatch: # lets you run it by hand from the Actions tab
+
+jobs:
+  check-prices:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: flight-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python flight_agent.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
