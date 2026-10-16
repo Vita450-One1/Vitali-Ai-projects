@@ -140,11 +140,16 @@ def call_model(conversation: list):
                     continue
                 if e.code not in (429, 503):
                     raise
-                print(f"   [busy] {model} returned {e.code}")
-                # 429 = this model's free quota is used up: skip it for the rest of the run.
-                if e.code == 429 and len(MODELS) > 1:
-                    MODELS.remove(model)
-        wait = 10 * (attempt + 1)
+                # Google's 429 error says which limit was hit: per minute or per day.
+                if e.code == 429 and "PerDay" in str(e.details):
+                    print(f"   [quota] {model}: daily free limit used up, skipping it today")
+                    if len(MODELS) > 1:
+                        MODELS.remove(model)
+                elif e.code == 429:
+                    print(f"   [busy] {model}: too many requests this minute")
+                else:
+                    print(f"   [busy] {model} is overloaded (503)")
+        wait = 20 * (attempt + 1)
         print(f"   [wait] all models busy, retrying in {wait} seconds...")
         time.sleep(wait)
     raise RuntimeError("Gemini is busy right now. Try again later.")
