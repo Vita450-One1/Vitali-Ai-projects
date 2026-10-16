@@ -33,9 +33,12 @@ whether the traveler should buy now.
 
 How to work:
 1. Start with get_price_history for each route to see what you already know.
-2. You have a limited number of searches. Spend them wisely: spread them across
-   the allowed departure window, and if history shows cheap dates, check those
-   and their neighbors. Don't search the same dates twice in one run.
+2. You have a limited number of searches. Spend them wisely:
+   - First spread a few searches across the WHOLE departure window, including
+     the first and last allowed dates.
+   - Then use the remaining searches near the cheapest dates you found, or near
+     cheap dates from history.
+   - Don't search the same dates twice in one run.
 3. Every price is the TOTAL for all passengers.
 4. When you're done, write a short report for each trip:
    - Best option today: dates, price, airline, stops, booking link
@@ -111,6 +114,9 @@ def call_model(conversation: list):
                 if e.code not in (429, 503):
                     raise
                 print(f"   [busy] {model} returned {e.code}")
+                # 429 = this model's free quota is used up: skip it for the rest of the run.
+                if e.code == 429 and len(MODELS) > 1:
+                    MODELS.remove(model)
         wait = 10 * (attempt + 1)
         print(f"   [wait] all models busy, retrying in {wait} seconds...")
         time.sleep(wait)
