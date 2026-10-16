@@ -43,7 +43,9 @@ How to work:
    - Then use the remaining searches near the cheapest dates you found, or near
      cheap dates from history.
    - Don't search the same dates twice in one run.
-3. Every price is the TOTAL for all passengers.
+3. Every price is the TOTAL for all passengers. Trips with "direct_only": true
+   only get nonstop flights from search_flights (the program filters them), so
+   don't mention connecting flights for those trips.
 4. When you're done, call submit_report ONCE for each trip with:
    - verdict: BUY NOW, WAIT, or WATCH.
      BUY NOW only if the price is at or below max_total_price AND you have
@@ -54,7 +56,8 @@ How to work:
    - headline: one short sentence with the key fact, e.g. "New lowest price:
      $847 for Aug 18-24" (no links - the email adds correct links itself).
    - reasoning: 2-4 sentences: how today compares with history, the cheapest
-     DIRECT option if the cheapest one has stops, and what you're waiting for.
+     DIRECT option if the cheapest one has stops (unless the trip is
+     direct_only), and what you're waiting for.
    After submitting all reports, reply with just: Done."""
 
 
@@ -204,6 +207,8 @@ def main() -> None:
     watchlist = json.loads(WATCHLIST_FILE.read_text())
     tools.searches_left = watchlist.get("searches_per_run", 6)
     tools.trip_routes = {t["name"]: tools.route_key(t["from"], t["to"]) for t in watchlist["trips"]}
+    tools.direct_only_routes = {tools.route_key(t["from"], t["to"])
+                                for t in watchlist["trips"] if t.get("direct_only")}
     if tools.FAKE_MODE:
         print("*** FAKE MODE: prices are made up ***\n")
 
@@ -229,7 +234,8 @@ def main() -> None:
     print("\n" + tools.links_table())
 
     subject, html = email_report.build_email(
-        watchlist, tools.reports, tools.todays_results, tools.load_history(),
+        watchlist, tools.reports, tools.todays_results,
+        {route: tools.matching_records(route) for route in tools.trip_routes.values()},
         fake=tools.FAKE_MODE, searches_used=searches_at_start - tools.searches_left,
     )
     email_report.PREVIEW_FILE.write_text(html, encoding="utf-8")

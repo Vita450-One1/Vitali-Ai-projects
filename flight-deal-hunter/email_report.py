@@ -120,6 +120,7 @@ def trip_card(trip: dict, report: dict, results: list, records: list) -> str:
         <div style="color:#718096;font-size:14px;margin-top:4px;">
           {escape(trip['from'])} ⇄ {escape(trip['to'])} · {trip['adults']} travelers · {trip['nights']} nights ·
           leaving {nice_date(trip['earliest_departure'])} – {nice_date(trip['latest_departure'])}
+          {' · <b style="color:#2b6cb0;">✈ Direct flights only</b>' if trip.get('direct_only') else ''}
         </div>
 
         <div style="background:{background};border-radius:10px;padding:16px;margin:18px 0;">

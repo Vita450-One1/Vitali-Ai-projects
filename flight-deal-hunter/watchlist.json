@@ -10,7 +10,8 @@
       "earliest_departure": "2027-08-15",
       "latest_departure": "2027-08-22",
       "nights": 6,
-      "max_total_price": 1500
+      "max_total_price": 1500,
+      "direct_only": true
     }
   ]
 }

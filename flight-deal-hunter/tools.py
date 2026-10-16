@@ -21,6 +21,7 @@ searches_left = 0  # set by the agent at the start of each run
 todays_results = []  # every successful search in this run, for the email
 reports = {}  # the agent's verdict for each trip, filled by submit_report
 trip_routes = {}  # trip name -> route, set by hunter.py
+direct_only_routes = set()  # routes where only nonstop flights count, set by hunter.py
 MIN_DAYS_FOR_BUY = 3  # BUY NOW needs this many earlier days of history
 
 
@@ -44,9 +45,15 @@ def route_key(origin: str, destination: str) -> str:
 
 # --- Tool 1: look at past prices -------------------------------------------
 
+def matching_records(route: str) -> list:
+    """Past prices that were searched with the same filter (direct-only or not)."""
+    direct = route in direct_only_routes
+    return [r for r in load_history().get(route, []) if r.get("direct_only", False) == direct]
+
+
 def get_price_history(origin: str, destination: str) -> dict:
     """Every price we've seen for this route, plus the lowest one."""
-    records = load_history().get(route_key(origin, destination), [])
+    records = matching_records(route_key(origin, destination))
     if not records:
         return {"route": route_key(origin, destination), "message": "No history yet."}
     lowest = min(records, key=lambda r: r["cheapest_price"])
@@ -62,7 +69,7 @@ def get_price_history(origin: str, destination: str) -> dict:
 def earlier_days(route: str) -> int:
     """On how many different days BEFORE today we checked this route."""
     today = date.today().isoformat()
-    days = {r["checked_at"][:10] for r in load_history().get(route, [])}
+    days = {r["checked_at"][:10] for r in matching_records(route)}
     return len({d for d in days if d < today})
 
 
@@ -88,7 +95,7 @@ def fake_search(depart_date: str) -> dict:
     }
 
 
-def serpapi_search(origin, destination, depart_date, return_date, adults) -> dict:
+def serpapi_search(origin, destination, depart_date, return_date, adults, direct_only) -> dict:
     response = requests.get(
         "https://serpapi.com/search",
         params={
@@ -101,6 +108,7 @@ def serpapi_search(origin, destination, depart_date, return_date, adults) -> dic
             "adults": adults,
             "currency": "USD",
             "hl": "en",
+            "stops": 1 if direct_only else 0,  # 1 = nonstop only, 0 = any number of stops
             "api_key": os.environ["SERPAPI_KEY"],
         },
         timeout=60,
@@ -113,6 +121,7 @@ def search_flights(origin: str, destination: str, depart_date: str,
                    nights: int, adults: int = 1) -> dict:
     """Search round-trip flights leaving on depart_date for `nights` nights. Costs one search."""
     global searches_left
+    direct_only = route_key(origin, destination) in direct_only_routes  # set by you, not the AI
     try:
         return_date = (date.fromisoformat(depart_date) + timedelta(days=int(nights))).isoformat()
     except ValueError:
@@ -124,14 +133,17 @@ def search_flights(origin: str, destination: str, depart_date: str,
     if FAKE_MODE:
         data = fake_search(depart_date)
     else:
-        data = serpapi_search(origin, destination, depart_date, return_date, adults)
+        data = serpapi_search(origin, destination, depart_date, return_date, adults, direct_only)
     if "error" in data:
         return {"error": data["error"]}
 
     options = [o for o in data.get("best_flights", []) + data.get("other_flights", [])
                if o.get("price")]
+    if direct_only:  # double-check in code: one flight segment = no stops
+        options = [o for o in options if len(o.get("flights", [])) == 1]
     if not options:
-        return {"error": f"No flights found for {depart_date} - {return_date}"}
+        kind = "direct flights" if direct_only else "flights"
+        return {"error": f"No {kind} found for {depart_date} - {return_date}"}
     options.sort(key=lambda o: o["price"])
 
     cheapest = [
@@ -163,6 +175,7 @@ def search_flights(origin: str, destination: str, depart_date: str,
         "return_date": return_date,
         "cheapest_price": cheapest[0]["price"],
         "google_price_level": insights.get("price_level"),
+        "direct_only": direct_only,
     })
     todays_results.append(result)
     # The AI doesn't get the link, so it can't miscopy it.
