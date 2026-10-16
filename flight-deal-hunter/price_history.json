@@ -41,6 +41,20 @@
       "return_date": "2027-08-27",
       "cheapest_price": 1360,
       "google_price_level": "typical"
+    },
+    {
+      "checked_at": "2026-10-16T21:37",
+      "depart_date": "2027-08-16",
+      "return_date": "2027-08-22",
+      "cheapest_price": 1528,
+      "google_price_level": "typical"
+    },
+    {
+      "checked_at": "2026-10-16T21:37",
+      "depart_date": "2027-08-20",
+      "return_date": "2027-08-26",
+      "cheapest_price": 1354,
+      "google_price_level": "typical"
     }
   ]
 }
