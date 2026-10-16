@@ -150,13 +150,38 @@ def call_model(conversation: list):
     raise RuntimeError("Gemini is busy right now. Try again later.")
 
 
+def nudge(conversation: list, text: str) -> None:
+    """Add a short message from the program, telling the agent to keep going."""
+    print(f"   [nudge] {text}")
+    conversation.append(types.Content(role="user", parts=[types.Part.from_text(text=text)]))
+
+
 def run_agent(task: str) -> str:
     conversation = [types.Content(role="user", parts=[types.Part.from_text(text=task)])]
+    nudges_left = 3
     for _ in range(25):  # safety limit: an agent should never loop forever
         response = call_model(conversation)
-        conversation.append(response.candidates[0].content)
+        content = response.candidates[0].content if response.candidates else None
+
+        # Sometimes a model answers with nothing at all. Don't treat that as "finished".
+        if not content or not content.parts:
+            if nudges_left == 0:
+                break
+            nudges_left -= 1
+            nudge(conversation, "Your last reply was empty. Please continue the task.")
+            continue
+
+        conversation.append(content)
         if not response.function_calls:
-            return response.text
+            # The agent thinks it's done. Is every trip reported?
+            missing = [name for name in tools.trip_routes if name not in tools.reports]
+            if missing and nudges_left > 0:
+                nudges_left -= 1
+                nudge(conversation, f"You haven't called submit_report for: {', '.join(missing)}. "
+                      f"You still have {tools.searches_left} searches. "
+                      "Finish the work, then call submit_report.")
+                continue
+            return response.text or ""
 
         results = []
         for call in response.function_calls:
@@ -167,7 +192,7 @@ def run_agent(task: str) -> str:
                 output = {"error": str(e)}
             results.append(types.Part.from_function_response(name=call.name, response=output))
         conversation.append(types.Content(role="user", parts=results))
-    return "Stopped: the agent took too many steps."
+    return "The agent stopped before finishing. Today's results are below."
 
 
 def main() -> None:
@@ -183,10 +208,12 @@ def main() -> None:
     )
     searches_at_start = tools.searches_left
     final_message = run_agent(task)
-    if not tools.reports:  # the agent forgot submit_report: keep its text instead
-        for trip in watchlist["trips"]:
-            tools.reports[trip["name"]] = {"verdict": "WATCH", "headline": "",
-                                           "reasoning": final_message}
+    for trip in watchlist["trips"]:  # any trip without a verdict: keep the agent's text
+        tools.reports.setdefault(trip["name"], {
+            "verdict": "WATCH", "headline": "No verdict from the agent today",
+            "reasoning": final_message or "The AI didn't finish its analysis. "
+                         "Today's prices are below.",
+        })
 
     for name, report in tools.reports.items():
         print(f"\n{name}: {report['verdict']} - {report['headline']}\n  {report['reasoning']}")

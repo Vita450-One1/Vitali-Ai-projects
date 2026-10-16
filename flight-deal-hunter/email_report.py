@@ -124,8 +124,8 @@ def trip_card(trip: dict, report: dict, results: list, records: list) -> str:
 
         <div style="background:{background};border-radius:10px;padding:16px;margin:18px 0;">
           <span style="background:{color};color:#fff;font-weight:700;font-size:13px;padding:4px 10px;border-radius:12px;">{icon} {escape(verdict)}</span>
-          <div style="font-size:16px;font-weight:600;color:#1a202c;margin-top:10px;">{escape(report.get('headline', ''))}</div>
-          <div style="font-size:14px;color:#4a5568;margin-top:6px;line-height:1.5;">{escape(report.get('reasoning', ''))}</div>
+          <div style="font-size:16px;font-weight:600;color:#1a202c;margin-top:10px;">{escape(report.get('headline') or '')}</div>
+          <div style="font-size:14px;color:#4a5568;margin-top:6px;line-height:1.5;">{escape(report.get('reasoning') or '')}</div>
         </div>
 
         <table width="100%" cellpadding="0" cellspacing="6"><tr>
