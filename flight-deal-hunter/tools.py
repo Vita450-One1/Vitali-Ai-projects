@@ -18,6 +18,7 @@ HERE = Path(__file__).parent
 HISTORY_FILE = HERE / ("price_history_fake.json" if FAKE_MODE else "price_history.json")
 
 searches_left = 0  # set by the agent at the start of each run
+todays_results = []  # every successful search in this run, for the links table
 
 
 # --- Price memory: a simple JSON file -------------------------------------
@@ -151,4 +152,21 @@ def search_flights(origin: str, destination: str, depart_date: str,
         "cheapest_price": cheapest[0]["price"],
         "google_price_level": insights.get("price_level"),
     })
-    return result
+    todays_results.append(result)
+    # The AI doesn't get the link, so it can't miscopy it.
+    return {k: v for k, v in result.items() if k != "booking_link"}
+
+
+def links_table() -> str:
+    """Booking links for today's searches, written by code so they are always correct."""
+    if not todays_results:
+        return ""
+    lines = ["Booking links (checked by code, cheapest first):"]
+    for r in sorted(todays_results, key=lambda r: r["cheapest_options"][0]["price"]):
+        best = r["cheapest_options"][0]
+        stops = "direct" if best["stops"] == 0 else f"{best['stops']} stop(s)"
+        lines.append(
+            f"  ${best['price']:>6}  {r['depart_date']} -> {r['return_date']}  "
+            f"{', '.join(best['airlines'])}, {stops}\n          {r['booking_link']}"
+        )
+    return "\n".join(lines)

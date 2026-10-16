@@ -41,12 +41,15 @@ How to work:
    - Don't search the same dates twice in one run.
 3. Every price is the TOTAL for all passengers.
 4. When you're done, write a short report for each trip:
-   - Best option today: dates, price, airline, stops, booking link
+   - Best option today: dates, price, airline, stops (no links: the program
+     adds a table of correct booking links below your report)
+   - If the cheapest option has stops, also mention the cheapest DIRECT option
    - Compared with history: new lowest? higher or lower than before?
    - Verdict: BUY NOW, WAIT, or WATCH, with a one-sentence reason.
-     BUY NOW only if the price is at or below max_total_price, or clearly the
-     lowest seen with prices rising. Be honest when you don't have enough
-     history to judge."""
+     BUY NOW only if the price is at or below max_total_price AND you have
+     history from at least 3 earlier days showing it is a good price (or prices
+     are rising). With less history, say WATCH and explain what you're waiting
+     to learn. Be honest when you don't have enough history to judge."""
 
 
 # --- Tool descriptions (all the AI sees of tools.py) -----------------------
@@ -155,6 +158,7 @@ def main() -> None:
     )
     report = run_agent(task)
     print("\n" + "=" * 60 + "\n" + report)
+    print("\n" + tools.links_table())
 
 
 if __name__ == "__main__":
