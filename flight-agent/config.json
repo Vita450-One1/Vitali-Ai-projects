@@ -2,20 +2,14 @@
   "currency": "USD",
   "routes": [
     {
-      "name": "New York to London",
-      "from": "JFK",
-      "to": "LHR",
-      "depart_date": "2026-12-18",
-      "return_date": "2027-01-03",
-      "adults": 1,
+      "name": "Tel Aviv to Budapest",
+      "from": "TLV",
+      "to": "BUD",
+      "depart_date": "2027-08-18",
+      "return_date": "2027-08-24",
+      "adults": 4,
       "max_price": 700
-    },
-    {
-      "name": "San Francisco to Tokyo (one way)",
-      "from": "SFO",
-      "to": "HND",
-      "depart_date": "2027-02-10",
-      "adults": 1
     }
+   
   ]
 }
