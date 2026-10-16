@@ -11,7 +11,10 @@
       "latest_departure": "2027-08-22",
       "nights": 6,
       "max_total_price": 1500,
-      "direct_only": true
+      "direct_only": true,
+      "carry_on_bags": 4,
+      "checked_bags": 2,
+      "checked_bag_fee_estimate": 50
     }
   ]
 }

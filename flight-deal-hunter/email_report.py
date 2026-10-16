@@ -35,12 +35,21 @@ def nice_date(iso: str) -> str:
     return date.fromisoformat(iso).strftime("%a %d %b")
 
 
+def total(option: dict) -> float:
+    """What the trip really costs: tickets + cabin bags + estimated suitcases."""
+    return option.get("total_with_bags", option.get("price", option.get("cheapest_price")))
+
+
+def record_total(record: dict) -> float:
+    return record.get("total_with_bags", record["cheapest_price"])
+
+
 def daily_lows(records: list) -> list:
     """Lowest price found on each day the agent ran, oldest first."""
     lows = {}
     for r in records:
         day = r["checked_at"][:10]
-        lows[day] = min(lows.get(day, r["cheapest_price"]), r["cheapest_price"])
+        lows[day] = min(lows.get(day, record_total(r)), record_total(r))
     return sorted(lows.items())
 
 
@@ -56,11 +65,16 @@ def stat_box(label: str, value: str, color: str = "#1a202c") -> str:
 
 def results_table(results: list, budget: float) -> str:
     rows = []
-    cheapest_price = results[0]["cheapest_options"][0]["price"] if results else None
+    cheapest_total = total(results[0]["cheapest_options"][0]) if results else None
     for r in results:
         best = r["cheapest_options"][0]
-        is_cheapest = best["price"] == cheapest_price
-        price_color = "#0f7b3f" if best["price"] <= budget else "#c53030"
+        is_cheapest = total(best) == cheapest_total
+        price_color = "#0f7b3f" if total(best) <= budget else "#c53030"
+        suitcases = r.get("estimated_suitcase_fees", 0)
+        breakdown = (f'<br><span style="color:#718096;font-size:11px;font-weight:400;">'
+                     f'{money(best["price"])} + ≈{money(suitcases)} bags</span>') if suitcases else ""
+        notes = "".join(f'<br><span style="color:#b7791f;font-size:11px;">🧳 {escape(n)}</span>'
+                        for n in best.get("baggage_notes", []))
         stops = "Direct" if best["stops"] == 0 else f"{best['stops']} stop{'s' * (best['stops'] > 1)}"
         rows.append(f"""
         <tr style="background:{'#f0fbf4' if is_cheapest else '#ffffff'};">
@@ -69,8 +83,8 @@ def results_table(results: list, budget: float) -> str:
             {'<span style="background:#0f7b3f;color:#fff;font-size:11px;padding:2px 6px;border-radius:8px;margin-left:4px;">BEST</span>' if is_cheapest else ''}
           </td>
           <td style="padding:10px 8px;border-bottom:1px solid #edf2f7;">{escape(', '.join(best['airlines']))}<br>
-            <span style="color:#718096;font-size:12px;">{stops} · {duration(best['duration_minutes'])}</span></td>
-          <td style="padding:10px 8px;border-bottom:1px solid #edf2f7;text-align:right;font-weight:700;color:{price_color};">{money(best['price'])}</td>
+            <span style="color:#718096;font-size:12px;">{stops} · {duration(best['duration_minutes'])}</span>{notes}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #edf2f7;text-align:right;font-weight:700;color:{price_color};white-space:nowrap;">{money(total(best))}{breakdown}</td>
           <td style="padding:10px 8px;border-bottom:1px solid #edf2f7;text-align:right;">
             <a href="{escape(r['booking_link'])}" style="background:#2b6cb0;color:#fff;text-decoration:none;padding:6px 12px;border-radius:6px;font-size:13px;">View</a>
           </td>
@@ -88,7 +102,7 @@ def history_chart(records: list, budget: float) -> str:
     lows = daily_lows(records)[-10:]
     if len(lows) < 2:
         return '<p style="color:#718096;font-size:13px;">The price chart appears after a few days of checking.</p>'
-    top = max(price for _, price in lows + [("", budget)])
+    top = max(price for _, price in lows + [("", budget)])  # totals incl. bags
     rows = []
     for day, price in lows:
         width = max(int(price / top * 100), 4)
@@ -108,9 +122,16 @@ def trip_card(trip: dict, report: dict, results: list, records: list) -> str:
     budget = trip["max_total_price"]
     verdict = report.get("verdict", "WATCH")
     color, background, icon = VERDICT_STYLES.get(verdict, VERDICT_STYLES["WATCH"])
-    results = sorted(results, key=lambda r: r["cheapest_options"][0]["price"])
-    best_today = results[0]["cheapest_options"][0]["price"] if results else None
-    lowest_ever = min((r["cheapest_price"] for r in records), default=None)
+    results = sorted(results, key=lambda r: total(r["cheapest_options"][0]))
+    best_today = total(results[0]["cheapest_options"][0]) if results else None
+    lowest_ever = min((record_total(r) for r in records), default=None)
+    cabin, checked = trip.get("carry_on_bags", 0), trip.get("checked_bags", 0)
+    bags_line = ""
+    if cabin or checked:
+        bags_line = (f'<div style="color:#718096;font-size:13px;margin-top:4px;">🧳 Prices include '
+                     f'{cabin} cabin bag{"s" * (cabin != 1)} (from Google) + {checked} checked '
+                     f'suitcase{"s" * (checked != 1)} (estimated at '
+                     f'{money(trip.get("checked_bag_fee_estimate", 0))} each way)</div>')
     budget_color = "#0f7b3f" if best_today and best_today <= budget else "#c53030"
 
     return f"""
@@ -122,6 +143,7 @@ def trip_card(trip: dict, report: dict, results: list, records: list) -> str:
           leaving {nice_date(trip['earliest_departure'])} – {nice_date(trip['latest_departure'])}
           {' · <b style="color:#2b6cb0;">✈ Direct flights only</b>' if trip.get('direct_only') else ''}
         </div>
+        {bags_line}
 
         <div style="background:{background};border-radius:10px;padding:16px;margin:18px 0;">
           <span style="background:{color};color:#fff;font-weight:700;font-size:13px;padding:4px 10px;border-radius:12px;">{icon} {escape(verdict)}</span>
@@ -155,7 +177,7 @@ def build_email(watchlist: dict, reports: dict, results: list, history: dict,
         report = reports.get(trip["name"], {"verdict": "WATCH", "headline": "",
                                             "reasoning": "The agent didn't give a verdict this time."})
         cards.append(trip_card(trip, report, trip_results, history.get(route, [])))
-        best = min((r["cheapest_options"][0]["price"] for r in trip_results), default=None)
+        best = min((total(r["cheapest_options"][0]) for r in trip_results), default=None)
         subject_parts.append(f"{trip['to']} {report['verdict']}" + (f" from {money(best)}" if best else ""))
 
     subject = ("[TEST - fake prices] " if fake else "") + "✈️ " + " | ".join(subject_parts)
@@ -176,7 +198,8 @@ def build_email(watchlist: dict, reports: dict, results: list, history: dict,
       <tr><td style="height:20px;"></td></tr>
       <tr><td>{fake_banner}{''.join(cards)}</td></tr>
       <tr><td style="color:#718096;font-size:12px;text-align:center;padding:8px 16px 24px;line-height:1.6;">
-        Prices are round-trip totals for all travelers, from Google Flights.
+        Prices are round-trip totals for all travelers, from Google Flights, plus your bag settings.
+        Suitcase fees are estimates - check the airline's price when booking.
         Always confirm the final price before you book.<br>
         {searches_used} searches used this run · sent by your AI agent 🤖
       </td></tr>

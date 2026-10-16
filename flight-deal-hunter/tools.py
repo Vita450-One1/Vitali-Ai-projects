@@ -21,7 +21,18 @@ searches_left = 0  # set by the agent at the start of each run
 todays_results = []  # every successful search in this run, for the email
 reports = {}  # the agent's verdict for each trip, filled by submit_report
 trip_routes = {}  # trip name -> route, set by hunter.py
-direct_only_routes = set()  # routes where only nonstop flights count, set by hunter.py
+trip_settings = {}  # route -> the trip from watchlist.json (filters, bags), set by hunter.py
+
+
+def settings_for(route: str) -> dict:
+    """The filters you chose for a route. The AI can't change these."""
+    trip = trip_settings.get(route, {})
+    return {
+        "direct_only": bool(trip.get("direct_only", False)),
+        "carry_on_bags": int(trip.get("carry_on_bags", 0)),
+        "checked_bags": int(trip.get("checked_bags", 0)),
+        "checked_bag_fee_estimate": float(trip.get("checked_bag_fee_estimate", 0)),
+    }
 MIN_DAYS_FOR_BUY = 3  # BUY NOW needs this many earlier days of history
 
 
@@ -46,9 +57,13 @@ def route_key(origin: str, destination: str) -> str:
 # --- Tool 1: look at past prices -------------------------------------------
 
 def matching_records(route: str) -> list:
-    """Past prices that were searched with the same filter (direct-only or not)."""
-    direct = route in direct_only_routes
-    return [r for r in load_history().get(route, []) if r.get("direct_only", False) == direct]
+    """Past prices searched with the same filters (direct-only, cabin bags), so they compare fairly."""
+    wanted = settings_for(route)
+    return [
+        r for r in load_history().get(route, [])
+        if r.get("direct_only", False) == wanted["direct_only"]
+        and r.get("carry_on_bags", 0) == wanted["carry_on_bags"]
+    ]
 
 
 def get_price_history(origin: str, destination: str) -> dict:
@@ -80,14 +95,16 @@ def google_flights_link(origin, destination, depart_date, return_date) -> str:
     return f"https://www.google.com/travel/flights?q={quote(query)}"
 
 
-def fake_search(depart_date: str) -> dict:
+def fake_search(depart_date: str, carry_on_bags: int = 0) -> dict:
     """Made-up but realistic-looking prices for practice runs."""
     day = date.fromisoformat(depart_date)
-    base = 900 + 60 * (day.weekday() in (4, 5, 6)) + random.randint(-120, 120)
+    base = 900 + 60 * (day.weekday() in (4, 5, 6)) + random.randint(-120, 120) + 30 * carry_on_bags
     return {
         "best_flights": [
             {"price": base + i * 70, "total_duration": 175 + i * 90,
-             "flights": [{"airline": airline}] * (1 + (i > 0))}
+             "flights": [{"airline": airline,
+                          "extensions": ["Checked baggage for a fee", "Average legroom (29 in)"]}]
+                        * (1 + (i > 0))}
             for i, airline in enumerate(["Wizz Air", "El Al", "LOT"])
         ],
         "price_insights": {"price_level": random.choice(["low", "typical", "high"]),
@@ -95,7 +112,8 @@ def fake_search(depart_date: str) -> dict:
     }
 
 
-def serpapi_search(origin, destination, depart_date, return_date, adults, direct_only) -> dict:
+def serpapi_search(origin, destination, depart_date, return_date, adults, direct_only,
+                   carry_on_bags) -> dict:
     response = requests.get(
         "https://serpapi.com/search",
         params={
@@ -109,6 +127,7 @@ def serpapi_search(origin, destination, depart_date, return_date, adults, direct
             "currency": "USD",
             "hl": "en",
             "stops": 1 if direct_only else 0,  # 1 = nonstop only, 0 = any number of stops
+            "bags": min(carry_on_bags, adults),  # cabin bags: their fees are included in the price
             "api_key": os.environ["SERPAPI_KEY"],
         },
         timeout=60,
@@ -121,7 +140,8 @@ def search_flights(origin: str, destination: str, depart_date: str,
                    nights: int, adults: int = 1) -> dict:
     """Search round-trip flights leaving on depart_date for `nights` nights. Costs one search."""
     global searches_left
-    direct_only = route_key(origin, destination) in direct_only_routes  # set by you, not the AI
+    settings = settings_for(route_key(origin, destination))  # set by you, not the AI
+    direct_only = settings["direct_only"]
     try:
         return_date = (date.fromisoformat(depart_date) + timedelta(days=int(nights))).isoformat()
     except ValueError:
@@ -131,9 +151,10 @@ def search_flights(origin: str, destination: str, depart_date: str,
     searches_left -= 1
 
     if FAKE_MODE:
-        data = fake_search(depart_date)
+        data = fake_search(depart_date, settings["carry_on_bags"])
     else:
-        data = serpapi_search(origin, destination, depart_date, return_date, adults, direct_only)
+        data = serpapi_search(origin, destination, depart_date, return_date, adults, direct_only,
+                              settings["carry_on_bags"])
     if "error" in data:
         return {"error": data["error"]}
 
@@ -146,12 +167,17 @@ def search_flights(origin: str, destination: str, depart_date: str,
         return {"error": f"No {kind} found for {depart_date} - {return_date}"}
     options.sort(key=lambda o: o["price"])
 
+    # Checked suitcases aren't in Google's price: add your estimate, both directions.
+    suitcases = settings["checked_bags"] * settings["checked_bag_fee_estimate"] * 2
     cheapest = [
         {
-            "price": o["price"],
+            "price": o["price"],  # tickets (+ cabin bags, if you set carry_on_bags)
+            "total_with_bags": round(o["price"] + suitcases),  # + estimated suitcase fees
             "airlines": sorted({leg.get("airline", "?") for leg in o.get("flights", [])}),
             "stops": max(len(o.get("flights", [])) - 1, 0),
             "duration_minutes": o.get("total_duration"),
+            "baggage_notes": sorted({ext for leg in o.get("flights", [])
+                                     for ext in leg.get("extensions", []) if "bag" in ext.lower()}),
         }
         for o in options[:3]
     ]
@@ -161,6 +187,8 @@ def search_flights(origin: str, destination: str, depart_date: str,
         "depart_date": depart_date,
         "return_date": return_date,
         "adults": adults,
+        "cabin_bags_included_in_price": settings["carry_on_bags"],
+        "estimated_suitcase_fees": round(suitcases),
         "cheapest_options": cheapest,
         "google_price_level": insights.get("price_level"),
         "typical_price_range": insights.get("typical_price_range"),
@@ -174,8 +202,10 @@ def search_flights(origin: str, destination: str, depart_date: str,
         "depart_date": depart_date,
         "return_date": return_date,
         "cheapest_price": cheapest[0]["price"],
+        "total_with_bags": cheapest[0]["total_with_bags"],
         "google_price_level": insights.get("price_level"),
         "direct_only": direct_only,
+        "carry_on_bags": settings["carry_on_bags"],
     })
     todays_results.append(result)
     # The AI doesn't get the link, so it can't miscopy it.
@@ -186,12 +216,12 @@ def links_table() -> str:
     """Booking links for today's searches, written by code so they are always correct."""
     if not todays_results:
         return ""
-    lines = ["Booking links (checked by code, cheapest first):"]
-    for r in sorted(todays_results, key=lambda r: r["cheapest_options"][0]["price"]):
+    lines = ["Booking links (checked by code, cheapest first, totals include bags):"]
+    for r in sorted(todays_results, key=lambda r: r["cheapest_options"][0]["total_with_bags"]):
         best = r["cheapest_options"][0]
         stops = "direct" if best["stops"] == 0 else f"{best['stops']} stop(s)"
         lines.append(
-            f"  ${best['price']:>6}  {r['depart_date']} -> {r['return_date']}  "
+            f"  ${best['total_with_bags']:>6}  {r['depart_date']} -> {r['return_date']}  "
             f"{', '.join(best['airlines'])}, {stops}\n          {r['booking_link']}"
         )
     return "\n".join(lines)
