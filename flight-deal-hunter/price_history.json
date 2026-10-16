@@ -1,0 +1,46 @@
+{
+  "TLV-BUD": [
+    {
+      "checked_at": "2026-10-16T21:11",
+      "depart_date": "2027-08-15",
+      "return_date": "2027-08-21",
+      "cheapest_price": 1549,
+      "google_price_level": "typical"
+    },
+    {
+      "checked_at": "2026-10-16T21:11",
+      "depart_date": "2027-08-18",
+      "return_date": "2027-08-24",
+      "cheapest_price": 847,
+      "google_price_level": "low"
+    },
+    {
+      "checked_at": "2026-10-16T21:11",
+      "depart_date": "2027-08-22",
+      "return_date": "2027-08-28",
+      "cheapest_price": 1421,
+      "google_price_level": "typical"
+    },
+    {
+      "checked_at": "2026-10-16T21:12",
+      "depart_date": "2027-08-17",
+      "return_date": "2027-08-23",
+      "cheapest_price": 1069,
+      "google_price_level": "low"
+    },
+    {
+      "checked_at": "2026-10-16T21:12",
+      "depart_date": "2027-08-19",
+      "return_date": "2027-08-25",
+      "cheapest_price": 1208,
+      "google_price_level": "typical"
+    },
+    {
+      "checked_at": "2026-10-16T21:12",
+      "depart_date": "2027-08-21",
+      "return_date": "2027-08-27",
+      "cheapest_price": 1360,
+      "google_price_level": "typical"
+    }
+  ]
+}
