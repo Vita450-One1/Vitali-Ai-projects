@@ -1,12 +1,14 @@
 """Trip Planner Agent - Step 1: the agent loop with one tool (weather)."""
 
 import json
+import time
 
 import requests
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
-MODEL = "gemini-flash-latest"  # always points at Google's current free Flash model
+# Tried in order: if the first model is busy, the agent falls back to the next.
+MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 
 SYSTEM_PROMPT = """You are a friendly travel assistant.
 Use the get_weather tool whenever the weather matters to the answer.
@@ -80,12 +82,29 @@ config = types.GenerateContentConfig(
 )
 
 
+def call_model(conversation: list):
+    """Send the conversation to Gemini, retrying and falling back when it's busy."""
+    for attempt in range(3):
+        for model in MODELS:
+            try:
+                return client.models.generate_content(
+                    model=model, contents=conversation, config=config
+                )
+            except errors.APIError as e:
+                # 503 = overloaded, 429 = free-tier limit hit. Anything else is a real error.
+                if e.code not in (429, 503):
+                    raise
+                print(f"   [busy] {model} returned {e.code}, trying the next option...")
+        wait = 5 * (attempt + 1)
+        print(f"   [wait] all models busy, retrying in {wait} seconds...")
+        time.sleep(wait)
+    raise RuntimeError("Gemini is busy right now. Please try again in a few minutes.")
+
+
 def ask_agent(conversation: list) -> str:
     while True:
         # 1. Send the whole conversation to the AI
-        response = client.models.generate_content(
-            model=MODEL, contents=conversation, config=config
-        )
+        response = call_model(conversation)
         # Remember what the AI said (including any tool requests)
         conversation.append(response.candidates[0].content)
 
@@ -115,8 +134,13 @@ def main() -> None:
             break
         if not question:
             continue
+        start = len(conversation)
         conversation.append(types.Content(role="user", parts=[types.Part.from_text(text=question)]))
-        print(f"Agent: {ask_agent(conversation)}\n")
+        try:
+            print(f"Agent: {ask_agent(conversation)}\n")
+        except Exception as e:
+            print(f"Agent error: {e}\n")
+            del conversation[start:]  # forget the failed question so you can ask again
 
 
 if __name__ == "__main__":
