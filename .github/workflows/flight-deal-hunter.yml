@@ -1,0 +1,63 @@
+name: Flight Deal Hunter
+
+on:
+  schedule:
+    # Every day at 05:13 UTC = 08:13 Israel time in winter, 08:13 + 1h in summer.
+    # Times here are always UTC. https://crontab.guru helps translate.
+    - cron: "13 5 * * *"
+  workflow_dispatch: # adds a "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write # lets the run save price_history.json back to the repo
+
+concurrency:
+  group: flight-deal-hunter # never two runs at once (they'd both edit the history)
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: flight-deal-hunter
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run the agent
+        run: python hunter.py
+        env:
+          FAKE_FLIGHTS: "0"
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
+
+      - name: Save price history to the repo
+        if: always() # even if the email failed, keep today's prices
+        run: |
+          git config user.name "flight-deal-hunter[bot]"
+          git config user.email "flight-deal-hunter@users.noreply.github.com"
+          git add price_history.json
+          if git diff --cached --quiet; then
+            echo "No new prices to save."
+          else
+            git commit -m "Price history: $(date -u +%Y-%m-%d)"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
+      - name: Keep a copy of the email
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: email-${{ github.run_number }}
+          path: flight-deal-hunter/last_email.html
+          if-no-files-found: ignore
+          retention-days: 14

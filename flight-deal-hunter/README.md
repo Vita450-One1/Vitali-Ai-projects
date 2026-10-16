@@ -7,7 +7,7 @@ sees, and tells you whether to **BUY NOW**, **WAIT**, or **WATCH**.
 |---|---|---|
 | 1 | Smart searching with a search budget, price memory, verdicts | ✅ |
 | 2 | A designed email report with verdict, results table and price trend | ✅ |
-| 3 | Runs every morning by itself (GitHub Actions) | later |
+| 3 | Runs every morning by itself (GitHub Actions) | ✅ |
 
 ## Files
 
@@ -57,3 +57,23 @@ SerpApi's free plan gives about 250 searches a month, roughly 8 a day. Instead o
 checking every date, the agent gets `searches_per_run` searches and must
 **decide** which dates are worth checking. It uses past prices to choose.
 Choosing how to spend a limited resource is a core agent skill.
+
+## Running every morning in the cloud (Step 3)
+
+`.github/workflows/flight-deal-hunter.yml` runs the agent every day at 05:13 UTC
+(08:13 Israel time in winter) on GitHub's computers, then saves
+`price_history.json` back to the repo so the next run remembers today's prices.
+
+One-time setup: in the repo on GitHub, open **Settings, then Secrets and
+variables, then Actions** and add these repository secrets:
+
+| Secret | Value |
+|---|---|
+| `GEMINI_API_KEY` | your Gemini key |
+| `SERPAPI_KEY` | your SerpApi key |
+| `GMAIL_ADDRESS` | your Gmail address |
+| `GMAIL_APP_PASSWORD` | your 16-letter Gmail app password |
+| `EMAIL_TO` (optional) | another address to send to |
+
+Test it: open the **Actions** tab, choose **Flight Deal Hunter**, then **Run workflow**.
+Every run also keeps a copy of the email under the run's **Artifacts** for 14 days.

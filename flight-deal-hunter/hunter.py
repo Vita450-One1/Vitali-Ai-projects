@@ -212,7 +212,11 @@ def main() -> None:
         + json.dumps(watchlist["trips"], indent=2)
     )
     searches_at_start = tools.searches_left
-    final_message = run_agent(task)
+    try:
+        final_message = run_agent(task)
+    except Exception as e:  # e.g. Gemini unavailable all day: still send today's prices
+        print(f"Agent error: {e}")
+        final_message = f"The AI couldn't finish today ({e}). Today's prices are below."
     for trip in watchlist["trips"]:  # any trip without a verdict: keep the agent's text
         tools.reports.setdefault(trip["name"], {
             "verdict": "WATCH", "headline": "No verdict from the agent today",
@@ -244,6 +248,7 @@ def main() -> None:
         print("Check that GMAIL_ADDRESS is right and GMAIL_APP_PASSWORD is the 16-letter")
         print("app password (not your normal password). Antivirus email protection can")
         print("also block it. The report is still saved in last_email.html.")
+        sys.exit(1)  # makes the run show as failed on GitHub, so you notice
 
 
 if __name__ == "__main__":

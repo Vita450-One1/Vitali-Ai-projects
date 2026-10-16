@@ -1,10 +1,7 @@
 name: Daily flight prices
 
+# Replaced by the Flight Deal Hunter (flight-deal-hunter.yml), so it only runs by hand now.
 on:
-  schedule:
-    # Every day at 06:13 UTC. Change this to your morning:
-    # https://crontab.guru helps translate times.
-    - cron: "13 6 * * *"
   workflow_dispatch: # lets you run it by hand from the Actions tab
 
 jobs:
