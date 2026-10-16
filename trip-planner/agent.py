@@ -212,7 +212,7 @@ config = types.GenerateContentConfig(
 )
 
 
-def call_model(conversation: list):
+def call_model(conversation: list, log=print):
     """Send the conversation to Gemini, retrying and falling back when it's busy."""
     for attempt in range(3):
         for model in list(MODELS):
@@ -228,17 +228,18 @@ def call_model(conversation: list):
                 # 503 = overloaded, 429 = free-tier limit hit. Anything else is a real error.
                 if e.code not in (429, 503):
                     raise
-                print(f"   [busy] {model} returned {e.code}, trying the next option...")
+                log(f"   [busy] {model} returned {e.code}, trying the next option...")
         wait = 5 * (attempt + 1)
-        print(f"   [wait] all models busy, retrying in {wait} seconds...")
+        log(f"   [wait] all models busy, retrying in {wait} seconds...")
         time.sleep(wait)
     raise RuntimeError("Gemini is busy right now. Please try again in a few minutes.")
 
 
-def ask_agent(conversation: list) -> str:
+def ask_agent(conversation: list, log=print) -> str:
+    """Run the agent loop. `log` receives progress lines (printed by default)."""
     while True:
         # 1. Send the whole conversation to the AI
-        response = call_model(conversation)
+        response = call_model(conversation, log)
         # Remember what the AI said (including any tool requests)
         conversation.append(response.candidates[0].content)
 
@@ -249,7 +250,7 @@ def ask_agent(conversation: list) -> str:
         # 3. Run each tool the AI asked for and send back the results
         results = []
         for call in response.function_calls:
-            print(f"   [tool] {call.name}({json.dumps(call.args)})")
+            log(f"   [tool] {call.name}({json.dumps(call.args)})")
             try:
                 output = TOOL_FUNCTIONS[call.name](**call.args)
             except Exception as e:
