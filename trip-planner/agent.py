@@ -10,7 +10,15 @@ from google import genai
 from google.genai import errors, types
 
 # Tried in order: if the first model is busy, the agent falls back to the next.
-MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
+# Models that don't exist for your key are skipped automatically.
+MODELS = [
+    "gemini-flash-latest",
+    "gemini-flash-lite-latest",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
 
 SYSTEM_PROMPT = """You are a friendly travel assistant who plans trips.
 Use your tools for facts instead of guessing:
@@ -204,12 +212,16 @@ config = types.GenerateContentConfig(
 def call_model(conversation: list):
     """Send the conversation to Gemini, retrying and falling back when it's busy."""
     for attempt in range(3):
-        for model in MODELS:
+        for model in list(MODELS):
             try:
                 return client.models.generate_content(
                     model=model, contents=conversation, config=config
                 )
             except errors.APIError as e:
+                # 404 = this model doesn't exist for your key: drop it and never try it again.
+                if e.code == 404 and len(MODELS) > 1:
+                    MODELS.remove(model)
+                    continue
                 # 503 = overloaded, 429 = free-tier limit hit. Anything else is a real error.
                 if e.code not in (429, 503):
                     raise
