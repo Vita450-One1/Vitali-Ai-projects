@@ -12,9 +12,12 @@ from google.genai import errors, types
 # Tried in order: if the first model is busy, the agent falls back to the next.
 # Models that don't exist for your key are skipped automatically.
 MODELS = [
-    "gemini-flash-latest",
-    "gemini-flash-lite-latest",
+    "gemini-flash-latest",       # nickname for Google's newest Flash
+    "gemini-3.7-flash",          # slightly older versions are often less busy
+    "gemini-3.6-flash",
     "gemini-3.5-flash",
+    "gemini-flash-lite-latest",  # "lite" = smaller and faster, a bit less smart
+    "gemini-3.5-flash-lite",
     "gemini-3.1-flash-lite",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
