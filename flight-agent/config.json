@@ -2,12 +2,12 @@
   "currency": "USD",
   "routes": [
     {
-      "name": "New York to London",
+      "name": "Tel Aviv to Budapest",
       "from": "JFK",
       "to": "LHR",
-      "depart_date": "2026-12-18",
-      "return_date": "2027-01-03",
-      "adults": 1,
+      "depart_date": "2027-08-18",
+      "return_date": "2027-08-24",
+      "adults": 2,
       "max_price": 700
     },
     {
