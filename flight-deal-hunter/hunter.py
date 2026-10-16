@@ -47,7 +47,8 @@ How to work:
 4. When you're done, call submit_report ONCE for each trip with:
    - verdict: BUY NOW, WAIT, or WATCH.
      BUY NOW only if the price is at or below max_total_price AND you have
-     history from at least 3 earlier days showing it is a good price (or prices
+     history from at least 3 earlier DAYS (earlier_days_checked in the
+     price history, NOT the number of dates searched) showing it is a good price (or prices
      are rising). With less history, choose WATCH. Choose WAIT when prices are
      clearly above normal and likely to drop.
    - headline: one short sentence with the key fact, e.g. "New lowest price:
@@ -172,6 +173,7 @@ def run_agent(task: str) -> str:
 def main() -> None:
     watchlist = json.loads(WATCHLIST_FILE.read_text())
     tools.searches_left = watchlist.get("searches_per_run", 6)
+    tools.trip_routes = {t["name"]: tools.route_key(t["from"], t["to"]) for t in watchlist["trips"]}
     if tools.FAKE_MODE:
         print("*** FAKE MODE: prices are made up ***\n")
 
@@ -202,8 +204,14 @@ def main() -> None:
     if not (os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD")):
         print("Not sending: set GMAIL_ADDRESS and GMAIL_APP_PASSWORD to get it by email.")
         return
-    email_report.send_email(subject, html)
-    print(f"Email sent: {subject}")
+    try:
+        email_report.send_email(subject, html)
+        print(f"Email sent: {subject}")
+    except Exception as e:
+        print(f"\nEmail NOT sent: {e}")
+        print("Check that GMAIL_ADDRESS is right and GMAIL_APP_PASSWORD is the 16-letter")
+        print("app password (not your normal password). Antivirus email protection can")
+        print("also block it. The report is still saved in last_email.html.")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,8 @@ HISTORY_FILE = HERE / ("price_history_fake.json" if FAKE_MODE else "price_histor
 searches_left = 0  # set by the agent at the start of each run
 todays_results = []  # every successful search in this run, for the email
 reports = {}  # the agent's verdict for each trip, filled by submit_report
+trip_routes = {}  # trip name -> route, set by hunter.py
+MIN_DAYS_FOR_BUY = 3  # BUY NOW needs this many earlier days of history
 
 
 # --- Price memory: a simple JSON file -------------------------------------
@@ -51,9 +53,17 @@ def get_price_history(origin: str, destination: str) -> dict:
     return {
         "route": route_key(origin, destination),
         "searches_so_far": len(records),
+        "earlier_days_checked": earlier_days(route_key(origin, destination)),
         "lowest_ever": lowest,
         "recent": records[-15:],
     }
+
+
+def earlier_days(route: str) -> int:
+    """On how many different days BEFORE today we checked this route."""
+    today = date.today().isoformat()
+    days = {r["checked_at"][:10] for r in load_history().get(route, [])}
+    return len({d for d in days if d < today})
 
 
 # --- Tool 2: search flights (and remember the result) ----------------------
@@ -180,5 +190,11 @@ def submit_report(trip_name: str, verdict: str, headline: str, reasoning: str) -
     """The agent's final answer for one trip, as structured data for the email."""
     if verdict not in ("BUY NOW", "WAIT", "WATCH"):
         return {"error": "verdict must be BUY NOW, WAIT or WATCH"}
+    # A rule that matters is enforced here in code, not just asked for in the prompt.
+    route = trip_routes.get(trip_name)
+    if verdict == "BUY NOW" and route and earlier_days(route) < MIN_DAYS_FOR_BUY:
+        return {"error": f"Rejected: BUY NOW needs at least {MIN_DAYS_FOR_BUY} earlier days "
+                         f"of history, but there are only {earlier_days(route)}. "
+                         "Submit again with WATCH and explain what you're waiting to learn."}
     reports[trip_name] = {"verdict": verdict, "headline": headline, "reasoning": reasoning}
     return {"saved": True}

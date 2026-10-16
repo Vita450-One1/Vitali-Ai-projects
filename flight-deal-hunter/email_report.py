@@ -193,6 +193,20 @@ def send_email(subject: str, html: str) -> None:
     message["To"] = os.environ.get("EMAIL_TO") or sender
     message.set_content("Open this email in an app that shows HTML to see your flight report.")
     message.add_alternative(html, subtype="html")
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-        smtp.login(sender, os.environ["GMAIL_APP_PASSWORD"].replace(" ", ""))
-        smtp.send_message(message)
+    password = os.environ["GMAIL_APP_PASSWORD"].replace(" ", "")
+
+    try:  # Gmail's usual secure connection
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+            smtp.login(sender, password)
+            smtp.send_message(message)
+    except smtplib.SMTPAuthenticationError:
+        raise RuntimeError("Gmail rejected the address or app password.") from None
+    except (smtplib.SMTPServerDisconnected, OSError):
+        # Some networks and antivirus programs block port 465: try port 587 instead.
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=30) as smtp:
+                smtp.starttls()
+                smtp.login(sender, password)
+                smtp.send_message(message)
+        except smtplib.SMTPAuthenticationError:
+            raise RuntimeError("Gmail rejected the address or app password.") from None
