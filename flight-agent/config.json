@@ -3,19 +3,13 @@
   "routes": [
     {
       "name": "Tel Aviv to Budapest",
-      "from": "JFK",
-      "to": "LHR",
+      "from": "TLV",
+      "to": "BUD",
       "depart_date": "2027-08-18",
       "return_date": "2027-08-24",
-      "adults": 2,
+      "adults": 4,
       "max_price": 700
-    },
-    {
-      "name": "San Francisco to Tokyo (one way)",
-      "from": "SFO",
-      "to": "HND",
-      "depart_date": "2027-02-10",
-      "adults": 1
     }
+   
   ]
 }
