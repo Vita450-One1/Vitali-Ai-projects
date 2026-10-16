@@ -18,7 +18,8 @@ HERE = Path(__file__).parent
 HISTORY_FILE = HERE / ("price_history_fake.json" if FAKE_MODE else "price_history.json")
 
 searches_left = 0  # set by the agent at the start of each run
-todays_results = []  # every successful search in this run, for the links table
+todays_results = []  # every successful search in this run, for the email
+reports = {}  # the agent's verdict for each trip, filled by submit_report
 
 
 # --- Price memory: a simple JSON file -------------------------------------
@@ -134,6 +135,7 @@ def search_flights(origin: str, destination: str, depart_date: str,
     ]
     insights = data.get("price_insights", {})
     result = {
+        "route": route_key(origin, destination),
         "depart_date": depart_date,
         "return_date": return_date,
         "adults": adults,
@@ -170,3 +172,13 @@ def links_table() -> str:
             f"{', '.join(best['airlines'])}, {stops}\n          {r['booking_link']}"
         )
     return "\n".join(lines)
+
+
+# --- Tool 3: hand in the final verdict --------------------------------------
+
+def submit_report(trip_name: str, verdict: str, headline: str, reasoning: str) -> dict:
+    """The agent's final answer for one trip, as structured data for the email."""
+    if verdict not in ("BUY NOW", "WAIT", "WATCH"):
+        return {"error": "verdict must be BUY NOW, WAIT or WATCH"}
+    reports[trip_name] = {"verdict": verdict, "headline": headline, "reasoning": reasoning}
+    return {"saved": True}
