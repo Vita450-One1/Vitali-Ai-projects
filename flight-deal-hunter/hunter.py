@@ -1,10 +1,13 @@
-"""Smart Flight Deal Hunter - Step 1: search smartly, remember, give a verdict.
+"""Smart Flight Deal Hunter - Step 2: search smartly, remember, email the results.
 
-Run:  python hunter.py            (real prices, uses SerpApi searches)
+Run:  python hunter.py               (real prices, uses SerpApi searches, sends email)
+      python hunter.py --no-email    (skip the email, just save last_email.html)
       set FAKE_FLIGHTS=1 first to practice with made-up prices.
 """
 
 import json
+import os
+import sys
 import time
 from datetime import date
 from pathlib import Path
@@ -12,6 +15,7 @@ from pathlib import Path
 from google import genai
 from google.genai import errors, types
 
+import email_report
 import tools
 
 WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
@@ -40,16 +44,17 @@ How to work:
      cheap dates from history.
    - Don't search the same dates twice in one run.
 3. Every price is the TOTAL for all passengers.
-4. When you're done, write a short report for each trip:
-   - Best option today: dates, price, airline, stops (no links: the program
-     adds a table of correct booking links below your report)
-   - If the cheapest option has stops, also mention the cheapest DIRECT option
-   - Compared with history: new lowest? higher or lower than before?
-   - Verdict: BUY NOW, WAIT, or WATCH, with a one-sentence reason.
+4. When you're done, call submit_report ONCE for each trip with:
+   - verdict: BUY NOW, WAIT, or WATCH.
      BUY NOW only if the price is at or below max_total_price AND you have
      history from at least 3 earlier days showing it is a good price (or prices
-     are rising). With less history, say WATCH and explain what you're waiting
-     to learn. Be honest when you don't have enough history to judge."""
+     are rising). With less history, choose WATCH. Choose WAIT when prices are
+     clearly above normal and likely to drop.
+   - headline: one short sentence with the key fact, e.g. "New lowest price:
+     $847 for Aug 18-24" (no links - the email adds correct links itself).
+   - reasoning: 2-4 sentences: how today compares with history, the cheapest
+     DIRECT option if the cheapest one has stops, and what you're waiting for.
+   After submitting all reports, reply with just: Done."""
 
 
 # --- Tool descriptions (all the AI sees of tools.py) -----------------------
@@ -86,9 +91,27 @@ TOOL_DECLARATIONS = [
     ),
 ]
 
+TOOL_DECLARATIONS.append(
+    types.FunctionDeclaration(
+        name="submit_report",
+        description="Hand in your final verdict for one trip. Call once per trip, at the end.",
+        parameters_json_schema={
+            "type": "object",
+            "properties": {
+                "trip_name": {"type": "string", "description": "The trip's name from the watchlist"},
+                "verdict": {"type": "string", "enum": ["BUY NOW", "WAIT", "WATCH"]},
+                "headline": {"type": "string", "description": "One short sentence"},
+                "reasoning": {"type": "string", "description": "2-4 sentences"},
+            },
+            "required": ["trip_name", "verdict", "headline", "reasoning"],
+        },
+    )
+)
+
 TOOL_FUNCTIONS = {
     "get_price_history": tools.get_price_history,
     "search_flights": tools.search_flights,
+    "submit_report": tools.submit_report,
 }
 
 
@@ -156,9 +179,31 @@ def main() -> None:
         f"Here is the watchlist. You have {tools.searches_left} searches for this run.\n"
         + json.dumps(watchlist["trips"], indent=2)
     )
-    report = run_agent(task)
-    print("\n" + "=" * 60 + "\n" + report)
+    searches_at_start = tools.searches_left
+    final_message = run_agent(task)
+    if not tools.reports:  # the agent forgot submit_report: keep its text instead
+        for trip in watchlist["trips"]:
+            tools.reports[trip["name"]] = {"verdict": "WATCH", "headline": "",
+                                           "reasoning": final_message}
+
+    for name, report in tools.reports.items():
+        print(f"\n{name}: {report['verdict']} - {report['headline']}\n  {report['reasoning']}")
     print("\n" + tools.links_table())
+
+    subject, html = email_report.build_email(
+        watchlist, tools.reports, tools.todays_results, tools.load_history(),
+        fake=tools.FAKE_MODE, searches_used=searches_at_start - tools.searches_left,
+    )
+    email_report.PREVIEW_FILE.write_text(html, encoding="utf-8")
+    print(f"\nEmail preview saved: {email_report.PREVIEW_FILE.name} (double-click to open)")
+
+    if "--no-email" in sys.argv:
+        return
+    if not (os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD")):
+        print("Not sending: set GMAIL_ADDRESS and GMAIL_APP_PASSWORD to get it by email.")
+        return
+    email_report.send_email(subject, html)
+    print(f"Email sent: {subject}")
 
 
 if __name__ == "__main__":
