@@ -1,0 +1,16 @@
+{
+  "currency": "USD",
+  "searches_per_run": 6,
+  "trips": [
+    {
+      "name": "Budapest family trip",
+      "from": "TLV",
+      "to": "BUD",
+      "adults": 4,
+      "earliest_departure": "2027-08-15",
+      "latest_departure": "2027-08-22",
+      "nights": 6,
+      "max_total_price": 700
+    }
+  ]
+}

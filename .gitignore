@@ -1,3 +1,4 @@
 tasks.json
 __pycache__/
 .venv/
+price_history_fake.json
