@@ -532,6 +532,26 @@
       "google_price_level": null,
       "direct_only": true,
       "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-22T10:16",
+      "depart_date": "2027-08-15",
+      "return_date": "2027-08-21",
+      "cheapest_price": 1550,
+      "total_with_bags": 1650,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-22T10:22",
+      "depart_date": "2027-08-22",
+      "return_date": "2027-08-28",
+      "cheapest_price": 2110,
+      "total_with_bags": 2210,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
     }
   ]
 }
