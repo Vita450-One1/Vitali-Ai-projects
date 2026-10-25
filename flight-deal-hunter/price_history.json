@@ -672,6 +672,66 @@
       "google_price_level": null,
       "direct_only": true,
       "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:50",
+      "depart_date": "2027-08-15",
+      "return_date": "2027-08-21",
+      "cheapest_price": 1784,
+      "total_with_bags": 1884,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:50",
+      "depart_date": "2027-08-22",
+      "return_date": "2027-08-28",
+      "cheapest_price": 2107,
+      "total_with_bags": 2207,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:51",
+      "depart_date": "2027-08-16",
+      "return_date": "2027-08-22",
+      "cheapest_price": 1524,
+      "total_with_bags": 1624,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:54",
+      "depart_date": "2027-08-19",
+      "return_date": "2027-08-25",
+      "cheapest_price": 1860,
+      "total_with_bags": 1960,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:54",
+      "depart_date": "2027-08-21",
+      "return_date": "2027-08-27",
+      "cheapest_price": 1896,
+      "total_with_bags": 1996,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
+    },
+    {
+      "checked_at": "2026-10-25T09:57",
+      "depart_date": "2027-08-20",
+      "return_date": "2027-08-26",
+      "cheapest_price": 1748,
+      "total_with_bags": 1848,
+      "google_price_level": null,
+      "direct_only": true,
+      "carry_on_bags": 3
     }
   ]
 }
