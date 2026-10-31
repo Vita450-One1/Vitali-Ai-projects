@@ -2,7 +2,7 @@
 
 1. Save your bot token:  setx TELEGRAM_BOT_TOKEN "123456:ABC..."  (then restart VS Code)
 2. Run:  .venv\\Scripts\\python.exe telegram_setup.py
-3. When it says "Waiting...", send your bot any message in Telegram, e.g. "hi"
+3. While it counts down, send your bot any message in Telegram, e.g. "hi"
    (or add the bot to a group and send /start@yourbot in the group)
 """
 
@@ -26,17 +26,21 @@ print(f"Your bot is @{bot}  ->  https://t.me/{bot}")
 requests.get(f"{api}/deleteWebhook", timeout=30)
 
 chats = {}
-for attempt in range(3):
-    if attempt == 0:
-        print(f"\nWaiting... open https://t.me/{bot} in Telegram, press Start, and send 'hi'.")
-    data = requests.get(f"{api}/getUpdates", params={"timeout": 25}, timeout=40).json()
-    for update in data.get("result", []):
-        message = update.get("message") or update.get("my_chat_member") or {}
-        chat = message.get("chat")
-        if chat:
-            chats[chat["id"]] = chat.get("title") or chat.get("first_name") or chat.get("username")
-    if chats:
-        break
+print(f"\nNow open https://t.me/{bot} in Telegram, press Start, and send 'hi'.")
+print("Waiting for your message (up to 2 minutes, don't press Ctrl+C)...")
+try:
+    for seconds_left in range(120, 0, -10):
+        print(f"  ...{seconds_left} seconds left", flush=True)
+        data = requests.get(f"{api}/getUpdates", params={"timeout": 10}, timeout=30).json()
+        for update in data.get("result", []):
+            message = update.get("message") or update.get("my_chat_member") or {}
+            chat = message.get("chat")
+            if chat:
+                chats[chat["id"]] = chat.get("title") or chat.get("first_name") or chat.get("username")
+        if chats:
+            break
+except KeyboardInterrupt:
+    sys.exit("\nStopped. Run it again when you're ready to send the message.")
 
 if not chats:
     sys.exit(f"\nNo message arrived. Make sure you're writing to @{bot} (not BotFather), "
