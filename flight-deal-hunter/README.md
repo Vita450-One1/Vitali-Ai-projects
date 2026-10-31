@@ -16,6 +16,8 @@ sees, and tells you whether to **BUY NOW**, **WAIT**, or **WATCH**.
 | `watchlist.json` | Your trips: route, date window, nights, travelers, budget |
 | `tools.py` | The tools: `search_flights`, `get_price_history`, `submit_report`, and the price memory |
 | `email_report.py` | Designs the HTML email and sends it with Gmail |
+| `notify_telegram.py` | Sends a short Telegram message |
+| `telegram_setup.py` | Helper: finds your Telegram chat ID and sends a test message |
 | `hunter.py` | The agent: instructions, tool descriptions, and the loop |
 | `price_history.json` | Created automatically: every price the agent has seen |
 
@@ -77,3 +79,14 @@ variables, then Actions** and add these repository secrets:
 
 Test it: open the **Actions** tab, choose **Flight Deal Hunter**, then **Run workflow**.
 Every run also keeps a copy of the email under the run's **Artifacts** for 14 days.
+
+## Telegram
+
+1. In Telegram, message **@BotFather**, send `/newbot`, and copy the token it gives you.
+2. `setx TELEGRAM_BOT_TOKEN "the-token"`, restart VS Code, send your new bot a message.
+3. `.venv\Scripts\python.exe telegram_setup.py` shows your chat ID and sends a test message.
+4. `setx TELEGRAM_CHAT_ID "the-id"` (several people: `"id1,id2"`), and add both as
+   GitHub secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`) for the daily cloud run.
+
+In `watchlist.json`, `"telegram"` is `"every_day"`, `"important_only"` (BUY NOW or a
+new lowest price), or `"off"`. Add `--no-telegram` to a run to skip it.

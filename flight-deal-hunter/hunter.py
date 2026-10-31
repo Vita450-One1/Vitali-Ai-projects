@@ -1,7 +1,8 @@
 """Smart Flight Deal Hunter - Step 2: search smartly, remember, email the results.
 
 Run:  python hunter.py               (real prices, uses SerpApi searches, sends email)
-      python hunter.py --no-email    (skip the email, just save last_email.html)
+      python hunter.py --no-email    (no email or Telegram, just save last_email.html)
+      python hunter.py --no-telegram (email only)
       set FAKE_FLIGHTS=1 first to practice with made-up prices.
 """
 
@@ -16,6 +17,7 @@ from google import genai
 from google.genai import errors, types
 
 import email_report
+import notify_telegram
 import tools
 
 WATCHLIST_FILE = Path(__file__).parent / "watchlist.json"
@@ -243,19 +245,46 @@ def main() -> None:
     email_report.PREVIEW_FILE.write_text(html, encoding="utf-8")
     print(f"\nEmail preview saved: {email_report.PREVIEW_FILE.name} (double-click to open)")
 
+    failed = False
+
+    # --- Email ---
     if "--no-email" in sys.argv:
-        return
-    if not (os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD")):
-        print("Not sending: set GMAIL_ADDRESS and GMAIL_APP_PASSWORD to get it by email.")
-        return
-    try:
-        email_report.send_email(subject, html)
-        print(f"Email sent: {subject}")
-    except Exception as e:
-        print(f"\nEmail NOT sent: {e}")
-        print("Check that GMAIL_ADDRESS is right and GMAIL_APP_PASSWORD is the 16-letter")
-        print("app password (not your normal password). Antivirus email protection can")
-        print("also block it. The report is still saved in last_email.html.")
+        print("Email skipped (--no-email).")
+    elif not (os.environ.get("GMAIL_ADDRESS") and os.environ.get("GMAIL_APP_PASSWORD")):
+        print("Not sending email: set GMAIL_ADDRESS and GMAIL_APP_PASSWORD to get it.")
+    else:
+        try:
+            email_report.send_email(subject, html)
+            print(f"Email sent: {subject}")
+        except Exception as e:
+            failed = True
+            print(f"\nEmail NOT sent: {e}")
+            print("Check that GMAIL_ADDRESS is right and GMAIL_APP_PASSWORD is the 16-letter")
+            print("app password (not your normal password). Antivirus email protection can")
+            print("also block it. The report is still saved in last_email.html.")
+
+    # --- Telegram (independent of the email: one failing doesn't stop the other) ---
+    if "--no-telegram" in sys.argv or "--no-email" in sys.argv:
+        pass
+    elif not (os.environ.get("TELEGRAM_BOT_TOKEN") and os.environ.get("TELEGRAM_CHAT_ID")):
+        print("Not sending Telegram: set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID to get it.")
+    else:
+        messages = notify_telegram.build_messages(
+            watchlist, tools.reports, tools.todays_results,
+            {route: tools.matching_records(route) for route in tools.trip_routes.values()},
+            fake=tools.FAKE_MODE,
+        )
+        if not messages:
+            print("Telegram: nothing important today, no message sent.")
+        for text in messages:
+            try:
+                notify_telegram.send(text)
+                print("Telegram message sent.")
+            except Exception as e:
+                failed = True
+                print(f"Telegram NOT sent: {e}")
+
+    if failed:
         sys.exit(1)  # makes the run show as failed on GitHub, so you notice
 
 

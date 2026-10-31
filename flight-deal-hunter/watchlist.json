@@ -14,7 +14,8 @@
       "direct_only": true,
       "carry_on_bags": 3,
       "checked_bags": 1,
-      "checked_bag_fee_estimate": 50
+      "checked_bag_fee_estimate": 50,
+      "telegram": "every_day"
     }
   ]
 }
